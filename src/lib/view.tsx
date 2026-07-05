@@ -378,9 +378,10 @@ export function ViewProvider({ children }: { children: ReactNode }) {
   const grid = gridFrame ? gridFrame.grid : null;
   const awardType = top.kind === "award" ? top.awardType : null;
   const matchDetailGame = top.kind === "match-detail" ? top.game : null;
+  const pickerFrame = lastOfKind(stack, "picker");
   const picker =
-    top.kind === "picker"
-      ? { meta: top.meta, episode: top.episode, autoPlay: top.autoPlay, attempt: top.attempt, intent: top.intent, resume: top.resume, lastPickedStream: top.lastPickedStream }
+    pickerFrame
+      ? { meta: pickerFrame.meta, episode: pickerFrame.episode, autoPlay: pickerFrame.autoPlay, attempt: pickerFrame.attempt, intent: pickerFrame.intent, resume: pickerFrame.resume, lastPickedStream: pickerFrame.lastPickedStream }
       : null;
   const player = top.kind === "player" ? top.src : null;
   const canGoBack = stack.length > 1;

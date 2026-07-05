@@ -699,7 +699,7 @@ function Shell() {
   const gridAlive = useKeepAlive(gridTop, !!grid, stackKinds.includes("grid"));
   const awardAlive = useKeepAlive(awardTop, awardTop);
   const animeAwardAlive = useKeepAlive(animeAwardTop, animeAwardTop && !!animeAwardSource);
-  const pickerAlive = useKeepAlive(pickerTop, !!picker);
+  const pickerAlive = useKeepAlive(pickerTop, !!picker, stackKinds.includes("picker"));
   const moviesAlive = useIdleEvict(moviesTop);
   const kidsAlive = useIdleEvict(kidsTop);
   const showsAlive = useIdleEvict(showsTop);

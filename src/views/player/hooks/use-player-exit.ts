@@ -29,6 +29,7 @@ export function usePlayerExit(params: {
   notifyHostLeaving: () => void;
   clearInvite: () => void;
   exitPlayback: () => void;
+  exitPlayer: () => void;
   openPicker: ReturnType<typeof useView>["openPicker"];
 }) {
   const {
@@ -49,10 +50,11 @@ export function usePlayerExit(params: {
     notifyHostLeaving,
     clearInvite,
     exitPlayback,
+    exitPlayer,
     openPicker,
   } = params;
 
-  const closePlayer = useCallback(async () => {
+  const cleanupPlayer = useCallback(async () => {
     await captureExitSnapshot();
     const pos = getPlaybackPosition();
     if (Number.isFinite(pos) && pos > 0) {
@@ -81,8 +83,17 @@ export function usePlayerExit(params: {
       notifyHostLeaving();
       clearInvite();
     }
+  }, [captureExitSnapshot, src.meta.id, src.meta.name, season, episode, inRoom, isHost, notifyHostLeaving, clearInvite, publishState, exitPip, liveStreamRef, liveUrl, src.url, stopCast, castActiveRef]);
+
+  const closePlayer = useCallback(async () => {
+    await cleanupPlayer();
     exitPlayback();
-  }, [captureExitSnapshot, exitPlayback, src.meta.id, src.meta.name, season, episode, inRoom, isHost, notifyHostLeaving, clearInvite, publishState, exitPip, liveStreamRef, liveUrl, src.url, stopCast, castActiveRef]);
+  }, [cleanupPlayer, exitPlayback]);
+
+  const closePlayerToPicker = useCallback(async () => {
+    await cleanupPlayer();
+    exitPlayer();
+  }, [cleanupPlayer, exitPlayer]);
 
   const onStubEject = useCallback(() => {
     const nextAttempt = (src.attempt ?? 0) + 1;
@@ -108,5 +119,5 @@ export function usePlayerExit(params: {
     );
   }, [src.attempt, src.meta, src.episode, src.streamRef, season, episode, openPicker, instantPlay, inRoom, closePlayer, bridgeRef]);
 
-  return { closePlayer, onStubEject };
+  return { closePlayer, closePlayerToPicker, onStubEject };
 }

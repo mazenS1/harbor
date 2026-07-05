@@ -13,12 +13,14 @@ export function StremioRow({
   addonLogo,
   match = null,
   onPlay,
+  previouslyPicked = false,
 }: {
   stream: ScoredStream;
   failed: boolean;
   addonLogo: string | null;
   match?: "same" | "close" | null;
   onPlay: () => void;
+  previouslyPicked?: boolean;
 }) {
   const { settings } = useSettings();
   const full = settings.fullStreamDescription;
@@ -31,7 +33,7 @@ export function StremioRow({
   return (
     <div
       className={`flex items-stretch gap-5 rounded-2xl bg-elevated/40 p-5 ring-1 transition-colors ${
-        failed ? "ring-danger/40 bg-danger/5" : "ring-edge-soft/50"
+        failed ? "ring-danger/40 bg-danger/5" : previouslyPicked ? "ring-accent/70" : "ring-edge-soft/50"
       }`}
     >
       <div className="flex w-[68px] shrink-0 flex-col items-center justify-center">
@@ -62,6 +64,9 @@ export function StremioRow({
         )}
         {failed && (
           <p className="text-[13px] font-medium text-danger">Unavailable, try another.</p>
+        )}
+        {!failed && previouslyPicked && (
+          <p className="text-[13px] font-medium text-accent">Last picked source</p>
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2 self-center">

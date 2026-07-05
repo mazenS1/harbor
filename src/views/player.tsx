@@ -71,7 +71,7 @@ import type { VolumeIndicatorState } from "@/components/player/volume-indicator"
 import type { ToastInfo } from "@/views/addons/addons-types";
 
 export function PlayerView({ src }: { src: PlayerSrc }) {
-  const { setChromeHidden, topPath, openPicker, exitPlayback, replacePlayerSrc } = useView();
+  const { setChromeHidden, topPath, openPicker, exitPlayback, exitPlayer, replacePlayerSrc } = useView();
   const { settings, update } = useSettings();
   const t = useT();
   const chromeTheme = resolveChromeTheme(settings.theme, settings.playerChromeTheme);
@@ -338,7 +338,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     publishState,
   });
 
-  const { closePlayer, onStubEject } = usePlayerExit({
+  const { closePlayer, closePlayerToPicker, onStubEject } = usePlayerExit({
     src,
     season,
     episode,
@@ -356,6 +356,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     notifyHostLeaving,
     clearInvite,
     exitPlayback,
+    exitPlayer,
     openPicker,
   });
   useEffect(() => {
@@ -748,6 +749,7 @@ export function PlayerView({ src }: { src: PlayerSrc }) {
     swappingEp,
     swapResolvingKey,
     closePlayer,
+    closePlayerToPicker,
     engineStats,
     isP2pEngine,
     setLoaderShowing,

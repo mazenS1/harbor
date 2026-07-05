@@ -10,7 +10,7 @@ import type { Meta } from "@/lib/cinemeta";
 import type { Rejection } from "@/lib/streams/trust";
 import type { Addon } from "@/lib/addons";
 import type { ScoredStream, Stream, Tier } from "@/lib/streams/types";
-import type { PlayEpisode } from "@/lib/view";
+import type { PickerStreamRef, PlayEpisode } from "@/lib/view";
 
 export async function cinemetaImdbFallback(
   name: string,
@@ -101,6 +101,28 @@ export function streamMatchesLangs(s: ScoredStream, prefs: string[]): boolean {
       (p) => l.toLowerCase() === p.toLowerCase() || l.toLowerCase().startsWith(p.toLowerCase()),
     ),
   );
+}
+
+export function streamMatchesPickerRef(s: ScoredStream, ref: PickerStreamRef): boolean {
+  if (ref.infoHash && s.infoHash) {
+    if (s.infoHash.toLowerCase() !== ref.infoHash.toLowerCase()) return false;
+    if (ref.fileIdx == null || s.fileIdx == null) return true;
+    return s.fileIdx === ref.fileIdx;
+  }
+  if (
+    ref.addonId &&
+    s.addonId === ref.addonId &&
+    ref.parsedTitle &&
+    s.parsedTitle === ref.parsedTitle &&
+    ref.resolution === s.resolution &&
+    ref.source === s.source &&
+    (ref.fileIdx == null || s.fileIdx == null || ref.fileIdx === s.fileIdx) &&
+    (ref.size == null || s.size == null || ref.size === s.size)
+  ) {
+    return true;
+  }
+  if (ref.url && s.url) return s.url === ref.url;
+  return false;
 }
 
 export function abbreviateLanguages(langs: string[]): string {

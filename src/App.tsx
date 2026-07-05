@@ -924,6 +924,7 @@ function Shell() {
                 attempt={picker.attempt}
                 intent={picker.intent}
                 resume={picker.resume}
+                lastPickedStream={picker.lastPickedStream}
               />
             </Suspense>
           </div>

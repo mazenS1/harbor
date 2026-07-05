@@ -13,7 +13,7 @@ import { readPlayback, readLastSeriesPlayback, streamMatchesEntry, streamMatches
 import { useSettings } from "@/lib/settings";
 import type { ScoredStream, Tier } from "@/lib/streams/types";
 import { isAddonRanked } from "@/lib/streams/addon-detect";
-import { useView, type PlayEpisode } from "@/lib/view";
+import { useView, type PickerStreamRef, type PlayEpisode } from "@/lib/view";
 import { exitWindowFullscreen } from "@/lib/fullscreen-state";
 import { useWindowFullscreen } from "@/lib/use-window-fullscreen";
 import { AutoExhaustedModal } from "./play-picker/auto-exhausted-modal";
@@ -58,6 +58,7 @@ export function PlayPicker({
   attempt,
   intent,
   resume,
+  lastPickedStream,
 }: {
   meta: Meta;
   episode?: PlayEpisode;
@@ -65,6 +66,7 @@ export function PlayPicker({
   attempt?: number;
   intent?: "play" | "download";
   resume?: boolean;
+  lastPickedStream?: PickerStreamRef;
 }) {
   const isDownload = intent === "download";
   const { openPlayer, openSettings, exitPickerToDetail } = useView();
@@ -85,7 +87,7 @@ export function PlayPicker({
   const [resolving, setResolving] = useState<{ stream: ScoredStream } | null>(null);
   const [failedStreams, setFailedStreams] = useState<Set<ScoredStream>>(new Set());
   const [selectedTier, setSelectedTier] = useState<Tier | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(() => !!lastPickedStream);
   const [downloadConfirm, setDownloadConfirm] = useState<{ label: string | null } | null>(null);
   const [strictMode, setStrictMode] = useState(settings.streamFilterLevel === "strict");
   const [forceShowAll, setForceShowAll] = useState(false);
@@ -153,6 +155,10 @@ export function PlayPicker({
     setStrictMode(settings.streamFilterLevel === "strict");
     setForceShowAll(false);
   }, [meta.id, episode?.season, episode?.episode, settings.streamFilterLevel]);
+
+  useEffect(() => {
+    if (lastPickedStream) setDrawerOpen(true);
+  }, [lastPickedStream]);
 
   const hostMatch = useMemo(
     () => (hostSourceForMedia && result ? buildMatchScores(result.picker.all, hostSourceForMedia) : null),
@@ -615,6 +621,7 @@ export function PlayPicker({
             preserveOrder={addonOrderMode || !!hostMatch}
             matchFor={hostMatch ? matchFor : undefined}
             onPlay={playManually}
+            lastPickedStream={lastPickedStream}
           />
         ) : (
           <>
@@ -686,6 +693,7 @@ export function PlayPicker({
                 resolvingId={resolving?.stream.infoHash ?? null}
                 showName={meta.name}
                 episode={episode}
+                lastPickedStream={lastPickedStream}
               />
             )}
           </>

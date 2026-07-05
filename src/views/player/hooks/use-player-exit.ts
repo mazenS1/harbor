@@ -1,4 +1,4 @@
-import { useCallback, type RefObject } from "react";
+import { useCallback, useRef, type RefObject } from "react";
 import { clearOnePickerCache } from "@/lib/picker-cache";
 import { clearPlayback, readPlayback, savePlayback, streamMatchesEntry } from "@/lib/playback-history";
 import type { PlayerBridge } from "@/lib/player/bridge";
@@ -53,6 +53,7 @@ export function usePlayerExit(params: {
     exitPlayer,
     openPicker,
   } = params;
+  const closingToPickerRef = useRef(false);
 
   const cleanupPlayer = useCallback(async () => {
     await captureExitSnapshot();
@@ -90,10 +91,16 @@ export function usePlayerExit(params: {
     exitPlayback();
   }, [cleanupPlayer, exitPlayback]);
 
-  const closePlayerToPicker = useCallback(async () => {
-    await cleanupPlayer();
+  const closePlayerToPicker = useCallback(() => {
+    if (closingToPickerRef.current) return;
+    closingToPickerRef.current = true;
+    if (bridgeRef.current) {
+      bridgeRef.current.destroy();
+      bridgeRef.current = null;
+    }
     exitPlayer();
-  }, [cleanupPlayer, exitPlayer]);
+    void cleanupPlayer();
+  }, [bridgeRef, cleanupPlayer, exitPlayer]);
 
   const onStubEject = useCallback(() => {
     const nextAttempt = (src.attempt ?? 0) + 1;

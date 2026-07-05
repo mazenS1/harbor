@@ -57,6 +57,10 @@ export type PlayerStreamRef = {
   cachedSlugs?: string[];
 };
 
+export type PickerStreamRef = PlayerStreamRef & {
+  url?: string | null;
+};
+
 export type GridSpec = {
   title: string;
   fetcher: (page: number) => Promise<Meta[]>;
@@ -99,7 +103,7 @@ export type Frame =
   | { kind: "grid"; grid: GridSpec }
   | { kind: "award"; awardType: import("./providers/wikidata").AwardType }
   | { kind: "anime-award"; sourceId: import("./anime-awards").AwardSourceId }
-  | { kind: "picker"; meta: Meta; episode?: PlayEpisode; autoPlay?: boolean; attempt?: number; intent?: "play" | "download"; resume?: boolean }
+  | { kind: "picker"; meta: Meta; episode?: PlayEpisode; autoPlay?: boolean; attempt?: number; intent?: "play" | "download"; resume?: boolean; lastPickedStream?: PickerStreamRef }
   | { kind: "player"; src: PlayerSrc }
   | { kind: "match-detail"; game: SportsGame };
 
@@ -156,7 +160,7 @@ type ViewValue = {
   animeAwardSource: import("./anime-awards").AwardSourceId | null;
   openAnimeAward: (s: import("./anime-awards").AwardSourceId) => void;
   homeResetTick: number;
-  picker: { meta: Meta; episode?: PlayEpisode; autoPlay?: boolean; attempt?: number; intent?: "play" | "download"; resume?: boolean } | null;
+  picker: { meta: Meta; episode?: PlayEpisode; autoPlay?: boolean; attempt?: number; intent?: "play" | "download"; resume?: boolean; lastPickedStream?: PickerStreamRef } | null;
   openPicker: (
     meta: Meta,
     episode?: PlayEpisode,
@@ -374,9 +378,10 @@ export function ViewProvider({ children }: { children: ReactNode }) {
   const grid = gridFrame ? gridFrame.grid : null;
   const awardType = top.kind === "award" ? top.awardType : null;
   const matchDetailGame = top.kind === "match-detail" ? top.game : null;
+  const pickerFrame = lastOfKind(stack, "picker");
   const picker =
-    top.kind === "picker"
-      ? { meta: top.meta, episode: top.episode, autoPlay: top.autoPlay, attempt: top.attempt, intent: top.intent, resume: top.resume }
+    pickerFrame
+      ? { meta: pickerFrame.meta, episode: pickerFrame.episode, autoPlay: pickerFrame.autoPlay, attempt: pickerFrame.attempt, intent: pickerFrame.intent, resume: pickerFrame.resume, lastPickedStream: pickerFrame.lastPickedStream }
       : null;
   const player = top.kind === "player" ? top.src : null;
   const canGoBack = stack.length > 1;
@@ -735,7 +740,18 @@ export function ViewProvider({ children }: { children: ReactNode }) {
       setPendingLiveSrc(src);
       return;
     }
-    setNavStack((cur) => pushFrame(cur, { kind: "player", src }));
+    setNavStack((cur) => {
+      const next = [...cur];
+      const top = next[next.length - 1];
+      if (top?.kind === "picker" && src.streamRef) {
+        next[next.length - 1] = {
+          ...top,
+          autoPlay: false,
+          lastPickedStream: { ...src.streamRef, url: src.url },
+        };
+      }
+      return pushFrame(next, { kind: "player", src });
+    });
   }, [setNavStack]);
 
   const confirmLeavePartyForLive = useCallback(() => {

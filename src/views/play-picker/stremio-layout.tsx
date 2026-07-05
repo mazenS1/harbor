@@ -1,11 +1,12 @@
 import { ChevronDown } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { addonLogoSrc, resolveAddonLogo } from "@/components/addon-logo";
 import type { Addon } from "@/lib/addons";
 import type { ScoredStream } from "@/lib/streams/types";
+import type { PickerStreamRef } from "@/lib/view";
 import { StremioRow } from "./stremio-row";
 import { FACET_DIMS, facetOptions, matchesFacets, type FacetState } from "./stream-facets";
-import { addonInstanceKey, buildAddonOptions } from "./picker-utils";
+import { addonInstanceKey, buildAddonOptions, streamMatchesPickerRef } from "./picker-utils";
 import { useSettings } from "@/lib/settings";
 import { matchesCustomFilter, type CustomStreamFilter } from "@/lib/streams/custom-filters";
 import { FacetMenuRow } from "./facet-menu-row";
@@ -20,6 +21,7 @@ export function StremioLayout({
   preserveOrder,
   matchFor,
   onPlay,
+  lastPickedStream,
 }: {
   streams: ScoredStream[];
   addons: Addon[] | null;
@@ -29,6 +31,7 @@ export function StremioLayout({
   preserveOrder?: boolean;
   matchFor?: (s: ScoredStream) => "same" | "close" | null;
   onPlay: (stream: ScoredStream) => void;
+  lastPickedStream?: PickerStreamRef;
 }) {
   const [filter, setFilter] = useState<string>("all");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -39,6 +42,7 @@ export function StremioLayout({
   const [builderOpen, setBuilderOpen] = useState(false);
   const [editingFilter, setEditingFilter] = useState<CustomStreamFilter | null>(null);
   const activeFilter = customFilters.find((f) => f.id === activeFilterId) ?? null;
+  const rowRefs = useRef(new Map<ScoredStream, HTMLDivElement>());
   const addonLogoMap = useMemo(() => {
     const m = new Map<string, string | null>();
     for (const a of addons ?? []) {
@@ -111,6 +115,20 @@ export function StremioLayout({
     ? "All"
     : addonOptions.find((o) => o.id === filter)?.name ?? "All";
   const filterLogo = filter === "all" ? null : addonLogoMap.get(filter) ?? null;
+  const pickedStream = useMemo(
+    () =>
+      lastPickedStream
+        ? visibleStreams.find((s) => streamMatchesPickerRef(s, lastPickedStream)) ?? null
+        : null,
+    [visibleStreams, lastPickedStream],
+  );
+  useLayoutEffect(() => {
+    if (!pickedStream) return;
+    const id = window.requestAnimationFrame(() => {
+      rowRefs.current.get(pickedStream)?.scrollIntoView({ block: "center", behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [pickedStream]);
   return (
     <div className="flex flex-col gap-3">
       <div className="relative">
@@ -189,14 +207,22 @@ export function StremioLayout({
       />
       <div className="flex flex-col gap-2">
         {visibleStreams.map((s, i) => (
-          <StremioRow
+          <div
             key={`${s.url ?? s.infoHash ?? s.title}-${i}`}
-            stream={s}
-            failed={failedStreams.has(s)}
-            addonLogo={addonLogoMap.get(s.addonUrl ?? "") ?? addonLogoMap.get(s.addonId) ?? null}
-            match={matchFor ? matchFor(s) : null}
-            onPlay={() => onPlay(s)}
-          />
+            ref={(el) => {
+              if (el) rowRefs.current.set(s, el);
+              else rowRefs.current.delete(s);
+            }}
+          >
+            <StremioRow
+              stream={s}
+              failed={failedStreams.has(s)}
+              addonLogo={addonLogoMap.get(s.addonUrl ?? "") ?? addonLogoMap.get(s.addonId) ?? null}
+              match={matchFor ? matchFor(s) : null}
+              onPlay={() => onPlay(s)}
+              previouslyPicked={s === pickedStream}
+            />
+          </div>
         ))}
       </div>
       {!pipelineDone && (

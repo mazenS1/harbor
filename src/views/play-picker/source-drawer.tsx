@@ -1,5 +1,5 @@
 import { ChevronDown, Download, ExternalLink, Loader2, Play, Zap } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AddonLogo, AddonLogoStack } from "@/components/addon-logo";
 import { CopyLinkButton, resolveStreamLink } from "@/components/player/copy-link-button";
 import { FlagStack } from "@/components/flag";
@@ -8,7 +8,7 @@ import { HostMatchChip } from "@/components/host-match-chip";
 import { useDebridClients } from "@/lib/debrid/registry";
 import { useSettings } from "@/lib/settings";
 import type { ScoredStream } from "@/lib/streams/types";
-import type { PlayEpisode } from "@/lib/view";
+import type { PickerStreamRef, PlayEpisode } from "@/lib/view";
 import { EditionChip } from "./edition-chip";
 import {
   addonInstanceKey,
@@ -19,6 +19,7 @@ import {
   streamSummaryParts,
   tierChipBadges,
   torrentFilename,
+  streamMatchesPickerRef,
 } from "./picker-utils";
 
 export function SourceDrawer({
@@ -35,6 +36,7 @@ export function SourceDrawer({
   resolvingId,
   showName,
   episode,
+  lastPickedStream,
 }: {
   open: boolean;
   onToggle: () => void;
@@ -49,8 +51,10 @@ export function SourceDrawer({
   resolvingId: string | null;
   showName: string;
   episode?: PlayEpisode;
+  lastPickedStream?: PickerStreamRef;
 }) {
   const [addonFilter, setAddonFilter] = useState("all");
+  const rowRefs = useRef(new Map<ScoredStream, HTMLLIElement>());
   const addonOptions = useMemo(() => buildAddonOptions(streams), [streams]);
   const shown = useMemo(
     () => (addonFilter === "all" ? streams : streams.filter((s) => addonInstanceKey(s) === addonFilter)),
@@ -59,6 +63,17 @@ export function SourceDrawer({
   useEffect(() => {
     if (addonFilter !== "all" && !addonOptions.some((o) => o.id === addonFilter)) setAddonFilter("all");
   }, [addonOptions, addonFilter]);
+  const pickedStream = useMemo(
+    () => (lastPickedStream ? shown.find((s) => streamMatchesPickerRef(s, lastPickedStream)) ?? null : null),
+    [shown, lastPickedStream],
+  );
+  useLayoutEffect(() => {
+    if (!open || !pickedStream) return;
+    const id = window.requestAnimationFrame(() => {
+      rowRefs.current.get(pickedStream)?.scrollIntoView({ block: "center", behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [open, pickedStream]);
   return (
     <div className="flex flex-col gap-4">
       <button
@@ -99,6 +114,10 @@ export function SourceDrawer({
           {shown.slice(0, 80).map((s, i) => (
             <SourceRow
               key={`${s.addonId}-${s.infoHash ?? s.url ?? i}`}
+              ref={(el) => {
+                if (el) rowRefs.current.set(s, el);
+                else rowRefs.current.delete(s);
+              }}
               stream={s}
               debrids={debrids}
               addonLogo={getAddonLogo(s.addonId)}
@@ -108,6 +127,7 @@ export function SourceDrawer({
               divider={i > 0}
               showName={showName}
               episode={episode}
+              previouslyPicked={s === pickedStream}
             />
           ))}
         </ul>
@@ -142,17 +162,7 @@ function AddonPill({
   );
 }
 
-function SourceRow({
-  stream,
-  debrids,
-  addonLogo,
-  match,
-  onPlay,
-  resolving,
-  divider,
-  showName,
-  episode,
-}: {
+const SourceRow = forwardRef<HTMLLIElement, {
   stream: ScoredStream;
   debrids: ReturnType<typeof useDebridClients>;
   addonLogo: string | null;
@@ -162,7 +172,19 @@ function SourceRow({
   divider: boolean;
   showName: string;
   episode?: PlayEpisode;
-}) {
+  previouslyPicked?: boolean;
+}>(function SourceRow({
+  stream,
+  debrids,
+  addonLogo,
+  match,
+  onPlay,
+  resolving,
+  divider,
+  showName,
+  episode,
+  previouslyPicked = false,
+}, ref) {
   const { settings } = useSettings();
   const cachedDebrids = debrids.filter((d) => stream.cached[d.slug]);
   const libraryDebrids = debrids.filter((d) => stream.inLibrary[d.slug]);
@@ -173,7 +195,12 @@ function SourceRow({
   const fname = settings.pickerShowFilename ? torrentFilename(stream) : "";
 
   return (
-    <li className={divider ? "border-t border-edge-soft/30" : ""}>
+    <li
+      ref={ref}
+      className={`${divider ? "border-t border-edge-soft/30" : ""} ${
+        previouslyPicked ? "bg-accent/[0.08] ring-1 ring-inset ring-accent/40" : ""
+      }`}
+    >
       <button
         onClick={onPlay}
         disabled={resolving}
@@ -193,6 +220,9 @@ function SourceRow({
             <p className="min-w-0 break-all font-mono text-[11px] leading-snug text-ink-subtle/75 line-clamp-2">
               {fname}
             </p>
+          )}
+          {previouslyPicked && (
+            <p className="text-[12px] font-semibold text-accent">Last picked source</p>
           )}
           <p className="flex items-center gap-2 truncate text-[12px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
             <AddonLogo
@@ -263,4 +293,4 @@ function SourceRow({
       </button>
     </li>
   );
-}
+});

@@ -13,7 +13,7 @@ import { readPlayback, readLastSeriesPlayback, streamMatchesEntry, streamMatches
 import { useSettings } from "@/lib/settings";
 import type { ScoredStream, Tier } from "@/lib/streams/types";
 import { isAddonRanked } from "@/lib/streams/addon-detect";
-import { useView, type PlayEpisode } from "@/lib/view";
+import { useView, type PickerStreamRef, type PlayEpisode } from "@/lib/view";
 import { exitWindowFullscreen } from "@/lib/fullscreen-state";
 import { useWindowFullscreen } from "@/lib/use-window-fullscreen";
 import { AutoExhaustedModal } from "./play-picker/auto-exhausted-modal";
@@ -41,6 +41,7 @@ import { SourceDrawer } from "./play-picker/source-drawer";
 import { TierStrip } from "./play-picker/tier-strip";
 import { usePickHandler } from "./play-picker/use-pick-handler";
 import { useActiveKid } from "@/lib/profiles";
+import { CANCEL_PICKER_AUTOPLAY_EVENT } from "@/lib/player/cancel-picker-autoplay";
 import { useAutoCandidates } from "./play-picker/use-auto-candidates";
 import { useAutoFire } from "./play-picker/use-auto-fire";
 import { useRoomInvite } from "./play-picker/use-room-invite";
@@ -58,6 +59,7 @@ export function PlayPicker({
   attempt,
   intent,
   resume,
+  lastPickedStream,
 }: {
   meta: Meta;
   episode?: PlayEpisode;
@@ -65,6 +67,7 @@ export function PlayPicker({
   attempt?: number;
   intent?: "play" | "download";
   resume?: boolean;
+  lastPickedStream?: PickerStreamRef;
 }) {
   const isDownload = intent === "download";
   const { openPlayer, openSettings, exitPickerToDetail } = useView();
@@ -85,7 +88,7 @@ export function PlayPicker({
   const [resolving, setResolving] = useState<{ stream: ScoredStream } | null>(null);
   const [failedStreams, setFailedStreams] = useState<Set<ScoredStream>>(new Set());
   const [selectedTier, setSelectedTier] = useState<Tier | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(() => !!lastPickedStream);
   const [downloadConfirm, setDownloadConfirm] = useState<{ label: string | null } | null>(null);
   const [strictMode, setStrictMode] = useState(settings.streamFilterLevel === "strict");
   const [forceShowAll, setForceShowAll] = useState(false);
@@ -153,6 +156,10 @@ export function PlayPicker({
     setStrictMode(settings.streamFilterLevel === "strict");
     setForceShowAll(false);
   }, [meta.id, episode?.season, episode?.episode, settings.streamFilterLevel]);
+
+  useEffect(() => {
+    if (lastPickedStream) setDrawerOpen(true);
+  }, [lastPickedStream]);
 
   const hostMatch = useMemo(
     () => (hostSourceForMedia && result ? buildMatchScores(result.picker.all, hostSourceForMedia) : null),
@@ -284,6 +291,19 @@ export function PlayPicker({
   const [autoAttemptIdx, setAutoAttemptIdx] = useState(0);
   const [autoExhausted, setAutoExhausted] = useState(false);
   const [autoCancelled, setAutoCancelled] = useState(false);
+  useEffect(() => {
+    const onCancelPickerAutoplay = (event: Event) => {
+      const detail = (event as CustomEvent<{ metaId?: string; season?: number; episode?: number }>).detail;
+      if (detail?.metaId !== meta.id) return;
+      if (detail.season !== episode?.season) return;
+      if (detail.episode !== episode?.episode) return;
+      autoFiredRef.current = true;
+      setAutoCancelled(true);
+      setResolving(null);
+    };
+    window.addEventListener(CANCEL_PICKER_AUTOPLAY_EVENT, onCancelPickerAutoplay);
+    return () => window.removeEventListener(CANCEL_PICKER_AUTOPLAY_EVENT, onCancelPickerAutoplay);
+  }, [meta.id, episode?.season, episode?.episode]);
   const isLiveLikeContent =
     !!meta.type && !["movie", "series", "anime"].includes(String(meta.type).toLowerCase());
   const autoActive =
@@ -615,6 +635,7 @@ export function PlayPicker({
             preserveOrder={addonOrderMode || !!hostMatch}
             matchFor={hostMatch ? matchFor : undefined}
             onPlay={playManually}
+            lastPickedStream={lastPickedStream}
           />
         ) : (
           <>
@@ -686,6 +707,7 @@ export function PlayPicker({
                 resolvingId={resolving?.stream.infoHash ?? null}
                 showName={meta.name}
                 episode={episode}
+                lastPickedStream={lastPickedStream}
               />
             )}
           </>

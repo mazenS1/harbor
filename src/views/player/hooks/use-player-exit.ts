@@ -5,6 +5,7 @@ import type { PlayerBridge } from "@/lib/player/bridge";
 import { getPlaybackPosition } from "@/lib/player/playback-clock";
 import { saveResumeMs } from "@/lib/resume";
 import { exitWindowFullscreenOnPlayerClose } from "@/lib/fullscreen-state";
+import { CANCEL_PICKER_AUTOPLAY_EVENT } from "@/lib/player/cancel-picker-autoplay";
 import type { PartialSyncState } from "@/lib/together/provider";
 import { useView, type PlayerSrc, type PlayerStreamRef } from "@/lib/view";
 import { MAX_AUTORETRY_ATTEMPTS } from "../player-utils";
@@ -94,13 +95,22 @@ export function usePlayerExit(params: {
   const closePlayerToPicker = useCallback(() => {
     if (closingToPickerRef.current) return;
     closingToPickerRef.current = true;
+    window.dispatchEvent(
+      new CustomEvent(CANCEL_PICKER_AUTOPLAY_EVENT, {
+        detail: {
+          metaId: src.meta.id,
+          season,
+          episode,
+        },
+      }),
+    );
     if (bridgeRef.current) {
       bridgeRef.current.destroy();
       bridgeRef.current = null;
     }
     exitPlayer();
     void cleanupPlayer();
-  }, [bridgeRef, cleanupPlayer, exitPlayer]);
+  }, [bridgeRef, cleanupPlayer, episode, exitPlayer, season, src.meta.id]);
 
   const onStubEject = useCallback(() => {
     const nextAttempt = (src.attempt ?? 0) + 1;

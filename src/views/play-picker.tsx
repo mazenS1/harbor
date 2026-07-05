@@ -41,6 +41,7 @@ import { SourceDrawer } from "./play-picker/source-drawer";
 import { TierStrip } from "./play-picker/tier-strip";
 import { usePickHandler } from "./play-picker/use-pick-handler";
 import { useActiveKid } from "@/lib/profiles";
+import { CANCEL_PICKER_AUTOPLAY_EVENT } from "@/lib/player/cancel-picker-autoplay";
 import { useAutoCandidates } from "./play-picker/use-auto-candidates";
 import { useAutoFire } from "./play-picker/use-auto-fire";
 import { useRoomInvite } from "./play-picker/use-room-invite";
@@ -290,6 +291,19 @@ export function PlayPicker({
   const [autoAttemptIdx, setAutoAttemptIdx] = useState(0);
   const [autoExhausted, setAutoExhausted] = useState(false);
   const [autoCancelled, setAutoCancelled] = useState(false);
+  useEffect(() => {
+    const onCancelPickerAutoplay = (event: Event) => {
+      const detail = (event as CustomEvent<{ metaId?: string; season?: number; episode?: number }>).detail;
+      if (detail?.metaId !== meta.id) return;
+      if (detail.season !== episode?.season) return;
+      if (detail.episode !== episode?.episode) return;
+      autoFiredRef.current = true;
+      setAutoCancelled(true);
+      setResolving(null);
+    };
+    window.addEventListener(CANCEL_PICKER_AUTOPLAY_EVENT, onCancelPickerAutoplay);
+    return () => window.removeEventListener(CANCEL_PICKER_AUTOPLAY_EVENT, onCancelPickerAutoplay);
+  }, [meta.id, episode?.season, episode?.episode]);
   const isLiveLikeContent =
     !!meta.type && !["movie", "series", "anime"].includes(String(meta.type).toLowerCase());
   const autoActive =
